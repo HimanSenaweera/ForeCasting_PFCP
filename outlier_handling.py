@@ -29,27 +29,29 @@ print(f"{'─'*55}")
 data_df_clean.index = pd.to_datetime(data_df_clean.index)
 print(f"\n✅ Done — use data_df_clean going forward")
 
-# ── Plot ──────────────────────────────────────────────────────────────────────
-orig_series  = data_df[TARGET_METRIC].dropna()
-clean_series = data_df_clean[TARGET_METRIC].dropna()
+fig, axes = plt.subplots(2, 1, figsize=(18, 8), sharex=False)
 
-fig, axes = plt.subplots(2, 1, figsize=(18, 8), sharex=True)
+plot_config = [
+    (axes[0], data_df[TARGET_METRIC].dropna(),       'BEFORE',  PALETTE['raw']),
+    (axes[1], data_df_clean[TARGET_METRIC].dropna(), 'AFTER',   PALETTE['raw']),
+]
 
-for ax, series, label, color in zip(
-    axes,
-    [orig_series, clean_series],
-    ['BEFORE treatment', 'AFTER treatment'],
-    ['steelblue', 'green'],
-):
+for ax, series, label, color in plot_config:
+    is_after = 'AFTER' in label
+
     ax.plot(pd.to_datetime(series.index), series.values,
-            marker='o', linewidth=2, color=color,
-            markersize=4, label='Actual')
+            marker='o', linewidth=2, color=color, markersize=5,
+            label='Actual (treated)' if is_after else 'Actual')
 
-    # mark outlier dates
+    ax.axvline(pd.to_datetime(LAST_TRAIN_DATE), color='grey',
+               linestyle='--', linewidth=1.2, label='Train/Test cutoff')
+
     for bad_date in OUTLIER_REPLACEMENTS:
-        ax.axvline(pd.to_datetime(bad_date),
-                   color='red' if 'BEFORE' in label else 'green',
-                   linestyle=':', linewidth=1.5, alpha=0.8)
+        d = datetime.date.fromisoformat(bad_date)
+        if d in pd.to_datetime(series.index).date:
+            ax.axvline(pd.to_datetime(bad_date),
+                       color='green' if is_after else 'red',
+                       linestyle=':', linewidth=1.2, alpha=0.8)
 
     y_min   = series.min()
     y_max   = series.max()
@@ -57,19 +59,19 @@ for ax, series, label, color in zip(
 
     ax.set_ylim(y_min - padding, y_max + padding)
     ax.fill_between(pd.to_datetime(series.index), series.values,
-                    y2=y_min - padding, alpha=0.08, color=color)
-    ax.set_title(f"[{label}]  —  {TARGET_METRIC}  ({PORTFOLIO} / {SUB_PORTFOLIO})",
-                 fontsize=12)
+                    y2=y_min - padding, alpha=0.12, color=color)
+
+    ax.set_title(f"[{label}]  —  {TARGET_METRIC}  ({PORTFOLIO} / {SUB_PORTFOLIO})")
     ax.set_ylabel('Outstanding Balances ($)')
+    ax.set_xlabel('Date')
+    ax.set_xticks(pd.to_datetime(series.index))
+    ax.tick_params(axis='x', rotation=45)
     ax.legend(fontsize=9)
-    ax.annotate(f"n = {len(series)}", xy=(0.01, 0.90),
+    ax.annotate(f"n = {len(series)}", xy=(0.01, 0.92),
                 xycoords='axes fraction', fontsize=10,
                 bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.7))
 
-axes[1].set_xlabel('Date')
-axes[1].tick_params(axis='x', rotation=45)
-
 plt.suptitle(f'Outlier Treatment — {TARGET_METRIC}  ({PORTFOLIO} / {SUB_PORTFOLIO})',
-             fontsize=14, fontweight='bold', y=1.01)
+             fontsize=15, fontweight='bold', y=1.01)
 plt.tight_layout()
 plt.show()
